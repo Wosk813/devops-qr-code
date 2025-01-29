@@ -11,6 +11,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build the Docker image of backend
-        run: docker build . --file api/Dockerfile --tag devops-qr-code-backend:$(date +%s)
+        run: docker build . --file Dockerfile --tag devops-qr-code-backend:$(date +%s)
+        working-directory: ./api
       - name: Build the Docker image of frontend
-        run: docker build . --file front-end-nextjs/Dockerfile --tag devops-qr-code-frontend:$(date +%s)
+        run: docker build . --file Dockerfile --tag devops-qr-code-frontend:$(date +%s)
+        working-directory: ./front-end-nextjs
