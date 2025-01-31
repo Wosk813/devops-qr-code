@@ -11,6 +11,8 @@ services:
       - ./api:/app
     environment:
       - PORT=8000
+    env_file:
+      - ./api/.env
     networks:
       - app-network
 
