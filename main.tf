@@ -1,58 +1,58 @@
-provider "aws" {
-  region = var.aws_region
+# VPC
+resource "google_compute_network" "vpc" {
+  name                    = var.network_name
+  auto_create_subnetworks = false
 }
 
-# Moduł VPC
-module "vpc" {
-  source = "terraform-aws-modules/vpc/aws"
-  version = "5.0.0"
-
-  name = "eks-vpc"
-  cidr = var.vpc_cidr
-
-  azs             = ["${var.aws_region}a", "${var.aws_region}b"]
-  private_subnets = var.private_subnet_cidrs
-  public_subnets  = var.public_subnet_cidrs
-
-  enable_nat_gateway = true
-  single_nat_gateway = true
-  
-  enable_dns_hostnames = true
-  enable_dns_support   = true
-
-  tags = {
-    Environment = var.environment
-    Terraform   = "true"
-    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
-  }
+# Subnet
+resource "google_compute_subnetwork" "subnet" {
+  name          = var.subnet_name
+  region        = var.region
+  network       = google_compute_network.vpc.name
+  ip_cidr_range = "10.0.0.0/24"
 }
 
-# EKS Cluster
-module "eks" {
-  source = "terraform-aws-modules/eks/aws"
-  version = "19.15.1"
+# GKE cluster
+resource "google_container_cluster" "primary" {
+  name     = var.cluster_name
+  location = var.zone
 
-  cluster_name    = var.cluster_name
-  cluster_version = var.cluster_version
+  # We can't create a cluster with no node pool defined, but we want to only use
+  # separately managed node pools. So we create the smallest possible default
+  # node pool and immediately delete it.
+  remove_default_node_pool = true
+  initial_node_count       = 1
 
-  vpc_id          = module.vpc.vpc_id
-  subnet_ids      = module.vpc.private_subnets
+  network    = google_compute_network.vpc.name
+  subnetwork = google_compute_subnetwork.subnet.name
+}
 
-  cluster_endpoint_public_access = true
+# Node Pool
+resource "google_container_node_pool" "primary_nodes" {
+  name       = "${var.cluster_name}-node-pool"
+  location   = var.zone
+  cluster    = google_container_cluster.primary.name
+  node_count = 1
 
-  eks_managed_node_groups = {
-    general = {
-      desired_size = var.desired_nodes
-      min_size     = var.min_nodes
-      max_size     = var.max_nodes
+  node_config {
+    oauth_scopes = [
+      "https://www.googleapis.com/auth/logging.write",
+      "https://www.googleapis.com/auth/monitoring",
+      "https://www.googleapis.com/auth/devstorage.read_only"
+    ]
 
-      instance_types = ["t3.medium"]
-      capacity_type  = "ON_DEMAND"
+    machine_type = "e2-small"
+    disk_size_gb = 20
+    disk_type    = "pd-standard"
+
+    metadata = {
+      disable-legacy-endpoints = "true"
     }
-  }
 
-  tags = {
-    Environment = var.environment
-    Terraform   = "true"
+    labels = {
+      env = "production"
+    }
+
+    tags = ["gke-node"]
   }
 }
