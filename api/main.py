@@ -2,44 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import qrcode
 from google.cloud import storage
-import os
 from io import BytesIO
-
-# Loading Environment variable (Google Cloud credentials)
-from dotenv import load_dotenv
-import json
-load_dotenv()
-
-# Create temporary credentials file from .env
-credentials_content = os.getenv("GOOGLE_CLOUD_CREDENTIALS")
-if credentials_content:
-    # Use absolute path in container
-    temp_credentials_path = "/app/temp_credentials.json"
-    try:
-        # Parse the JSON string to ensure it's valid
-        json_credentials = json.loads(credentials_content)
-        
-        # Write the credentials to a temporary file
-        with open(temp_credentials_path, "w") as f:
-            json.dump(json_credentials, f)
-            
-        # Set the environment variable to point to our temporary file
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = temp_credentials_path
-        print(f"Credentials file created at: {temp_credentials_path}")
-    except json.JSONDecodeError as e:
-        print(f"Error parsing credentials JSON: {e}")
-    except Exception as e:
-        print(f"Error setting up credentials: {e}")
-else:
-    print("Warning: GOOGLE_CLOUD_CREDENTIALS environment variable not found")
-
-# Initialize storage client after credentials are set up
-try:
-    storage_client = storage.Client()
-    bucket_name = 'qr-code-devops-project'
-    bucket = storage_client.bucket(bucket_name)
-except Exception as e:
-    print(f"Error initializing storage client: {e}")
 
 app = FastAPI()
 
@@ -49,6 +12,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Initialize storage client
+storage_client = storage.Client()
+bucket_name = 'qr-code-devops-project'
+bucket = storage_client.bucket(bucket_name)
 
 @app.post("/generate-qr/")
 async def generate_qr(url: str):
