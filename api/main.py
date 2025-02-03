@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import qrcode
 from google.cloud import storage
 from io import BytesIO
+import google.auth
 
 app = FastAPI()
 
@@ -70,4 +71,22 @@ async def generate_qr(url: str):
             status_code=500, 
             detail=f"Error generating QR code: {str(e)}"
         )
+
+@app.get("/debug")
+async def debug_credentials():
+    # Sprawdź, jakie credentials są aktualnie używane
+    credentials, project = google.auth.default()
+    
+    # Spróbuj pobrać informacje o service account
+    storage_client = storage.Client()
+    try:
+        buckets = list(storage_client.list_buckets())
+        return {
+            "project": project,
+            "credentials_type": str(type(credentials)),
+            "service_account": credentials.service_account_email if hasattr(credentials, 'service_account_email') else None,
+            "buckets": [b.name for b in buckets]
+        }
+    except Exception as e:
+        return {"error": str(e)}
     
